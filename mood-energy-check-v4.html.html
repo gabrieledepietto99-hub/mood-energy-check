@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mood Energy Check — Health Performance Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       CSS V4 — DAILY COACH
+       Sezioni:
+       1.  Variabili globali
+       2.  Reset & base
+       3.  Layout
+       4.  Header
+       5.  [V4] Card IERI (riepilogo precedente)
+       6.  Slider
+       7.  Pulsanti
+       8.  Loading
+       9.  Gauge + Delta Visuale
+       10. Cards risultati (insight, suggerimenti)
+       11. [V4] Daily Coach cards (confronto, decisione, THM)
+       12. Trend & Storico (V3 invariato)
+       13. Animazioni
+    ═══════════════════════════════════════════════════════ */
+
+    /* ── 1. VARIABILI ── */
+    :root {
+      --navy:         #0B2240;
+      --navy-mid:     #163760;
+      --c-green:      #1A8C5B;
+      --c-green-soft: #E4F5EC;
+      --c-green-mid:  #5DCAA5;
+      --c-yellow:     #D4940A;
+      --c-yellow-soft:#FDF3DC;
+      --c-red:        #C93535;
+      --c-red-soft:   #FCECEC;
+      --surface:      #F3F7FB;
+      --card:         #FFFFFF;
+      --border:       rgba(11,34,64,0.08);
+      --border-md:    rgba(11,34,64,0.14);
+      --text-1:       #0B2240;
+      --text-2:       #4A6A8A;
+      --text-3:       #8AABCC;
+      --track-bg:     #D5E3EF;
+      --f-ui:   'Syne', sans-serif;
+      --f-disp: 'Lora', serif;
+      --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-2xl:28px;
+    }
+
+    /* ── 2. RESET ── */
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    html { font-size:16px; -webkit-text-size-adjust:100%; }
+    body { font-family:var(--f-ui); background:var(--surface); color:var(--text-1); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+    /* ── 3. LAYOUT ── */
+    .app { max-width:430px; margin:0 auto; padding-bottom:56px; }
+
+    /* ── 4. HEADER ── */
+    .hdr { background:var(--navy); padding:28px 22px 24px; position:relative; overflow:hidden; }
+    .hdr::before { content:''; position:absolute; top:-60px; right:-60px; width:200px; height:200px; border-radius:50%; background:rgba(26,140,91,0.09); pointer-events:none; }
+    .hdr::after  { content:''; position:absolute; bottom:-40px; left:30%; width:120px; height:120px; border-radius:50%; background:rgba(55,138,221,0.07); pointer-events:none; }
+    .hdr-brand { display:flex; align-items:center; gap:11px; margin-bottom:14px; }
+    .hdr-logo  { width:38px; height:38px; background:var(--c-green); border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .hdr-logo i { color:white; font-size:20px; }
+    .hdr-lab  { font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#7BA8CC; margin-bottom:3px; }
+    .hdr-appname { font-family:var(--f-disp); font-size:18px; color:white; line-height:1; }
+    .hdr-dt { display:flex; align-items:center; gap:7px; }
+    .hdr-date { font-size:12px; color:#7BA8CC; font-weight:500; }
+    .hdr-time { font-size:12px; color:#9BBFDA; border-left:1px solid rgba(123,168,204,.28); padding-left:7px; }
+    .hdr-sub  { margin-top:12px; font-size:12px; color:rgba(255,255,255,.42); line-height:1.5; }
+
+    /* ── 5. [V4] CARD IERI ───────────────────────────────────
+       Mostrata sopra gli slider nella schermata form.
+       Se non ci sono record precedenti mostra il messaggio
+       del primo check. Tutta la logica è in buildYesterdayCard().
+       Per modificare l'aspetto: intervieni su .ycard-* qui sotto.
+    ──────────────────────────────────────────────────────── */
+    .ycard-wrap { padding:16px 14px 0; }
+
+    /* Card con record precedente */
+    .ycard {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--r-xl);
+      padding:14px 16px;
+      position:relative;
+      overflow:hidden;
+    }
+    /* Accent line a sinistra — colore impostato via JS in base al semaforo */
+    .ycard-accent {
+      position:absolute; left:0; top:0; bottom:0;
+      width:4px; border-radius:4px 0 0 4px;
+    }
+    .ycard-head {
+      display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    }
+    .ycard-ico {
+      width:28px; height:28px; background:rgba(11,34,64,.06);
+      border-radius:7px; display:flex; align-items:center;
+      justify-content:center; flex-shrink:0;
+    }
+    .ycard-ico i { font-size:14px; color:var(--text-2); }
+    .ycard-label {
+      font-size:9px; font-weight:700; letter-spacing:.12em;
+      text-transform:uppercase; color:var(--text-3);
+    }
+    /* Tre metriche in riga: Score | Stato | Driver */
+    .ycard-metrics {
+      display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:8px;
+    }
+    .ycard-metric {}
+    .ycard-metric-label {
+      font-size:9px; font-weight:600; letter-spacing:.08em;
+      text-transform:uppercase; color:var(--text-3); margin-bottom:3px;
+    }
+    .ycard-metric-val {
+      font-size:14px; font-weight:700; color:var(--text-1); line-height:1;
+    }
+    .ycard-metric-val.green  { color:var(--c-green); }
+    .ycard-metric-val.yellow { color:var(--c-yellow); }
+    .ycard-metric-val.red    { color:var(--c-red); }
+
+    /* Card primo check */
+    .ycard-first {
+      background:rgba(11,34,64,.03);
+      border:1px dashed var(--border-md);
+      border-radius:var(--r-xl);
+      padding:14px 16px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .ycard-first i { font-size:20px; color:var(--text-3); flex-shrink:0; }
+    .ycard-first-txt { font-size:12px; color:var(--text-2); line-height:1.5; }
+    .ycard-first-txt strong { color:var(--text-1); font-weight:700; }
+
+    /* ── 6. SLIDER ── */
+    .sliders { padding:14px 14px 0; }
+    .sec-label { font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--text-3); margin-bottom:12px; padding-left:2px; }
+    .s-card { background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg); padding:15px 15px 13px; margin-bottom:9px; transition:border-color .2s, box-shadow .2s; }
+    .s-card:focus-within { border-color:var(--border-md); box-shadow:0 2px 12px rgba(11,34,64,.06); }
+    .s-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
+    .s-id  { display:flex; align-items:center; gap:9px; }
+    .s-ico { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .s-ico i { font-size:16px; }
+    .s-name { font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .s-desc { font-size:10px; color:var(--text-2); margin-top:1px; }
+    .s-badge { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; flex-shrink:0; transition:background .25s, color .25s; }
+    .s-wrap  { position:relative; padding-bottom:16px; }
+    input[type=range] { -webkit-appearance:none; width:100%; height:5px; border-radius:3px; outline:none; cursor:pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:21px; height:21px; border-radius:50%; border:2.5px solid white; box-shadow:0 2px 6px rgba(0,0,0,.16); cursor:pointer; transition:transform .15s; }
+    input[type=range]:active::-webkit-slider-thumb { transform:scale(1.18); }
+    input[type=range]::-moz-range-thumb { width:21px; height:21px; border-radius:50%; border:2.5px solid white; cursor:pointer; }
+    .s-minmax { position:absolute; bottom:0; left:0; right:0; display:flex; justify-content:space-between; font-size:9px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+
+    /* ── 7. PULSANTI ── */
+    .btn-area { padding:8px 14px 0; }
+    .btn-pri { width:100%; padding:15px; background:var(--navy); color:white; border:none; border-radius:var(--r-lg); font-family:var(--f-ui); font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .2s, transform .1s, box-shadow .2s; }
+    .btn-pri:hover  { background:var(--navy-mid); box-shadow:0 4px 16px rgba(11,34,64,.22); }
+    .btn-pri:active { transform:scale(.98); }
+    .btn-sec { width:100%; padding:12px; background:transparent; color:var(--text-2); border:1px solid var(--border-md); border-radius:var(--r-lg); font-family:var(--f-ui); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .2s; }
+    .btn-sec:hover { background:rgba(11,34,64,.04); }
+
+    /* ── 8. LOADING ── */
+    .load-screen { display:none; padding:72px 24px; flex-direction:column; align-items:center; text-align:center; }
+    .load-ring-wrap { position:relative; width:64px; height:64px; margin-bottom:24px; }
+    .load-ring { width:64px; height:64px; border-radius:50%; border:2.5px solid rgba(11,34,64,.08); border-top-color:var(--navy); animation:spin .9s linear infinite; }
+    .load-dot  { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:10px; height:10px; border-radius:50%; background:var(--c-green); animation:pulse 1.8s ease-in-out infinite; }
+    @keyframes spin  { to { transform:rotate(360deg); } }
+    @keyframes pulse { 0%,100%{transform:translate(-50%,-50%) scale(.8);opacity:.5} 50%{transform:translate(-50%,-50%) scale(1.2);opacity:1} }
+    .load-txt { font-size:13px; color:var(--text-2); font-weight:500; }
+    .load-sub { font-size:11px; color:var(--text-3); margin-top:4px; }
+
+    /* ── 9. GAUGE + DELTA VISUALE ────────────────────────────────
+       Il Delta Visuale è posizionato subito sotto il badge semaforo,
+       dentro la gauge card. Deve essere molto evidente.
+       Tre varianti: migliorato (verde), peggiorato (rosso), stabile (grigio).
+       La logica di calcolo è in calcDelta() nel JS.
+    ──────────────────────────────────────────────────────────── */
+    .result-screen { display:none; padding:20px 14px 0; }
+    .gauge-card { border-radius:var(--r-2xl); padding:28px 20px 24px; margin-bottom:14px; border:1px solid transparent; position:relative; overflow:hidden; transition:background .4s, border-color .4s; }
+    .gauge-wrap { display:flex; flex-direction:column; align-items:center; }
+    .gauge-svg  { width:200px; height:116px; overflow:visible; }
+    .gauge-number { font-family:var(--f-disp); font-size:60px; font-weight:600; line-height:1; text-align:center; margin-top:-8px; transition:color .4s; }
+    .gauge-sub { font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; opacity:.5; margin-top:2px; text-align:center; }
+    .traffic-badge { display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:999px; margin-top:16px; transition:background .4s, color .4s; }
+    .traffic-badge i { font-size:16px; }
+    .traffic-badge-label { font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+
+    /* Delta Visuale — il blocco più evidente della gauge card */
+    .delta-wrap {
+      margin-top:14px;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    /* Pill grande con freccia + punti + etichetta */
+    .delta-pill {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:9px 18px;
+      border-radius:999px;
+      font-size:13px; font-weight:700; letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .delta-pill i { font-size:18px; }
+    /* Colori delta — modificabili qui */
+    .delta-pill.up     { background:rgba(255,255,255,0.22); color:white; }
+    .delta-pill.down   { background:rgba(255,255,255,0.22); color:white; }
+    .delta-pill.stable { background:rgba(255,255,255,0.18); color:rgba(255,255,255,0.7); }
+    /* Quando si è su card chiara (non usata qui ma utile per future varianti) */
+    .delta-pill.up.on-light     { background:var(--c-green-soft); color:var(--c-green); }
+    .delta-pill.down.on-light   { background:var(--c-red-soft); color:var(--c-red); }
+    .delta-pill.stable.on-light { background:rgba(11,34,64,.06); color:var(--text-2); }
+
+    .gauge-title { font-family:var(--f-disp); font-size:19px; font-weight:600; line-height:1.25; margin-top:20px; margin-bottom:8px; }
+    .gauge-desc  { font-size:13px; line-height:1.7; opacity:.72; }
+
+    /* ── 10. CARDS RISULTATI ── */
+    .params-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:16px; }
+    .p-mini { background:var(--card); border:1px solid var(--border); border-radius:var(--r-md); padding:10px 6px; text-align:center; }
+    .p-val  { display:block; font-size:20px; font-weight:700; line-height:1; margin-bottom:4px; }
+    .p-lbl  { font-size:9px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); }
+    .sep    { height:1px; background:var(--border); margin:0 0 16px; }
+    .insight-box { background:var(--card); border:1px solid var(--border); border-radius:var(--r-xl); padding:18px 17px; margin-bottom:12px; position:relative; overflow:hidden; }
+    .insight-accent { position:absolute; left:0; top:0; bottom:0; width:4px; border-radius:4px 0 0 4px; }
+    .insight-head   { display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+    .insight-ico    { width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+    .insight-tag    { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:2px; }
+    .insight-param  { font-size:12px; font-weight:700; color:var(--text-1); letter-spacing:.04em; }
+    .insight-text   { font-size:13px; color:var(--text-2); line-height:1.65; }
+    .sug-card  { background:var(--card); border:1px solid var(--border); border-radius:var(--r-lg); padding:15px; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start; }
+    .sug-ico   { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .sug-tag   { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:3px; }
+    .sug-title { font-size:14px; font-weight:600; margin-bottom:4px; line-height:1.3; }
+    .sug-txt   { font-size:12px; color:var(--text-2); line-height:1.6; }
+
+    /* ── 11. [V4] DAILY COACH CARDS ─────────────────────────────
+       Tre nuove card: Confronto, Priorità del Giorno, Take Home Message.
+       Vengono mostrate solo se esiste un record precedente recente
+       (per Confronto) o sempre (per Priorità e THM).
+       Per modificare i testi: vedi sezione B-COACH nel JS.
+    ──────────────────────────────────────────────────────────── */
+
+    /* Sezione Daily Coach — separatore visivo */
+    .coach-section {
+      margin-top: 4px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+    .coach-section-label {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .coach-section-label i { font-size: 13px; }
+
+    /* Card confronto con ieri — stile simile all'insight ma con accent blu navy */
+    .coach-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      padding: 16px 17px;
+      margin-bottom: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .coach-accent {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 4px; border-radius: 4px 0 0 4px;
+      background: var(--navy);
+    }
+    .coach-tag {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--text-3); margin-bottom: 6px;
+    }
+    .coach-text {
+      font-size: 13px; color: var(--text-1); line-height: 1.65;
+    }
+    .coach-text-muted {
+      font-size: 12px; color: var(--text-2); line-height: 1.6;
+      margin-top: 5px;
+    }
+
+    /* Card Priorità del Giorno — accent navy + icona target */
+    .decision-card {
+      background: var(--navy);
+      border-radius: var(--r-xl);
+      padding: 18px 17px;
+      margin-bottom: 10px;
+      display: flex; gap: 13px; align-items: flex-start;
+    }
+    .decision-ico {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 19px; color: white;
+    }
+    .decision-tag {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(255,255,255,0.45); margin-bottom: 5px;
+    }
+    .decision-title {
+      font-size: 14px; font-weight: 700;
+      color: white; line-height: 1.3; margin-bottom: 5px;
+    }
+    .decision-text {
+      font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.6;
+    }
+
+    /* Take Home Message — sostituisce la quote block della V3
+       Stile più operativo: border verde + testo in grassetto */
+    .thm-card {
+      background: var(--c-green-soft);
+      border: 1px solid rgba(26,140,91,0.2);
+      border-radius: var(--r-xl);
+      padding: 16px 17px;
+      margin-bottom: 14px;
+      display: flex; gap: 11px; align-items: flex-start;
+    }
+    .thm-ico {
+      width: 32px; height: 32px;
+      background: var(--c-green);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 16px; color: white;
+    }
+    .thm-tag {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(26,140,91,0.6); margin-bottom: 4px;
+    }
+    .thm-text {
+      font-family: var(--f-disp);
+      font-size: 14px; font-style: italic;
+      color: #0F4D30; line-height: 1.6;
+    }
+
+    /* ── 12. TREND & STORICO (V3 — invariato) ── */
+    .trend-section { margin-top:6px; padding-top:18px; border-top:1px solid var(--border); }
+    .trend-header { display:flex; align-items:center; gap:10px; padding:0 0 14px; }
+    .trend-header-ico { width:34px; height:34px; background:var(--navy); border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .trend-header-ico i { color:white; font-size:17px; }
+    .trend-header-title { font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    .trend-header-sub   { font-size:10px; color:var(--text-3); margin-top:1px; }
+    .trend-empty { background:var(--card); border:1px dashed var(--border-md); border-radius:var(--r-xl); padding:28px 20px; text-align:center; margin-bottom:12px; }
+    .trend-empty i  { font-size:32px; color:var(--text-3); margin-bottom:10px; display:block; }
+    .trend-empty p  { font-size:13px; color:var(--text-2); line-height:1.6; }
+    .trend-empty span { font-size:11px; color:var(--text-3); margin-top:4px; display:block; }
+    .trend-insight-card { background:var(--card); border:1px solid var(--border); border-radius:var(--r-xl); padding:16px 17px; margin-bottom:12px; position:relative; overflow:hidden; }
+    .trend-insight-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--navy); border-radius:4px 0 0 4px; }
+    .trend-insight-tag  { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:10px; }
+    .trend-insight-row  { display:flex; align-items:flex-start; gap:9px; margin-bottom:9px; }
+    .trend-insight-row:last-child { margin-bottom:0; }
+    .trend-insight-bullet { width:6px; height:6px; border-radius:50%; background:var(--navy); margin-top:6px; flex-shrink:0; }
+    .trend-insight-text { font-size:13px; color:var(--text-1); line-height:1.6; }
+    .chart-card { background:var(--card); border:1px solid var(--border); border-radius:var(--r-xl); padding:18px 16px 14px; margin-bottom:12px; }
+    .chart-card-label { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:14px; }
+    .chart-wrap { position:relative; height:160px; }
+    .history-card { background:var(--card); border:1px solid var(--border); border-radius:var(--r-xl); padding:16px; margin-bottom:12px; overflow:hidden; }
+    .history-card-label { font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text-3); margin-bottom:12px; }
+    .history-scroll { overflow-x:auto; }
+    .history-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .history-table th { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); padding:0 6px 8px 0; text-align:left; border-bottom:1px solid var(--border); }
+    .history-table td { padding:9px 6px 9px 0; border-bottom:1px solid var(--border); color:var(--text-1); vertical-align:middle; }
+    .history-table tr:last-child td { border-bottom:none; }
+    .state-pill  { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+    .state-pill.green  { background:var(--c-green-soft); color:var(--c-green); }
+    .state-pill.yellow { background:var(--c-yellow-soft); color:var(--c-yellow); }
+    .state-pill.red    { background:var(--c-red-soft); color:var(--c-red); }
+    .driver-pill { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:600; color:var(--text-2); white-space:nowrap; }
+    .driver-pill i { font-size:12px; }
+    .score-cell { font-weight:700; font-size:13px; }
+    .score-cell.green  { color:var(--c-green); }
+    .score-cell.yellow { color:var(--c-yellow); }
+    .score-cell.red    { color:var(--c-red); }
+    .btn-reset-history { width:100%; padding:11px; background:transparent; color:var(--c-red); border:1px solid rgba(201,53,53,0.22); border-radius:var(--r-lg); font-family:var(--f-ui); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; transition:background .2s; margin-top:4px; }
+    .btn-reset-history:hover { background:var(--c-red-soft); }
+
+    /* ── 13. ANIMAZIONI ── */
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    .ai { animation:fadeUp .45s ease both; }
+    .ai:nth-child(1){animation-delay:.05s} .ai:nth-child(2){animation-delay:.11s}
+    .ai:nth-child(3){animation-delay:.17s} .ai:nth-child(4){animation-delay:.23s}
+    .ai:nth-child(5){animation-delay:.29s} .ai:nth-child(6){animation-delay:.35s}
+    .ai:nth-child(7){animation-delay:.41s} .ai:nth-child(8){animation-delay:.47s}
+    .ai:nth-child(9){animation-delay:.53s} .ai:nth-child(10){animation-delay:.59s}
+    .ai:nth-child(11){animation-delay:.65s}
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-brand">
+      <div class="hdr-logo"><i class="ti ti-activity" aria-hidden="true"></i></div>
+      <div><div class="hdr-lab">Health Performance Lab</div><div class="hdr-appname">Mood Energy Check</div></div>
+    </div>
+    <div class="hdr-dt">
+      <span class="hdr-date" id="hdr-date">—</span>
+      <span class="hdr-time" id="hdr-time">—</span>
+    </div>
+    <p class="hdr-sub">Daily Coach · Readiness & Performance</p>
+  </header>
+
+  <!-- ═══════════════════════════════════
+       SCHERMATA 1: FORM
+  ═══════════════════════════════════ -->
+  <section id="screen-form">
+
+    <!-- [V4] Card IERI — popolata da buildYesterdayCard() nel JS -->
+    <div class="ycard-wrap" id="ycard-wrap"></div>
+
+    <div class="sliders">
+      <p class="sec-label">Valuta il tuo stato oggi</p>
+      <!-- SLIDER UMORE -->
+      <div class="s-card">
+        <div class="s-top">
+          <div class="s-id">
+            <div class="s-ico" style="background:#E1F5EE;"><i class="ti ti-mood-smile" style="color:#1A8C5B;" aria-hidden="true"></i></div>
+            <div><div class="s-name">Umore</div><div class="s-desc">Stato emotivo generale</div></div>
+          </div>
+          <div class="s-badge" id="b-mood" style="background:#E1F5EE;color:#0F6E56;">5</div>
+        </div>
+        <div class="s-wrap">
+          <input type="range" id="s-mood" min="1" max="10" value="5" step="1" data-color="#1A8C5B" aria-label="Umore" />
+          <div class="s-minmax"><span>Basso</span><span>Elevato</span></div>
+        </div>
+      </div>
+      <!-- SLIDER ENERGIA -->
+      <div class="s-card">
+        <div class="s-top">
+          <div class="s-id">
+            <div class="s-ico" style="background:#E6F1FB;"><i class="ti ti-bolt" style="color:#185FA5;" aria-hidden="true"></i></div>
+            <div><div class="s-name">Energia</div><div class="s-desc">Livello di vitalità fisica</div></div>
+          </div>
+          <div class="s-badge" id="b-energy" style="background:#E6F1FB;color:#185FA5;">5</div>
+        </div>
+        <div class="s-wrap">
+          <input type="range" id="s-energy" min="1" max="10" value="5" step="1" data-color="#185FA5" aria-label="Energia" />
+          <div class="s-minmax"><span>Esausto</span><span>Sprint</span></div>
+        </div>
+      </div>
+      <!-- SLIDER STRESS -->
+      <div class="s-card">
+        <div class="s-top">
+          <div class="s-id">
+            <div class="s-ico" style="background:#FAECE7;"><i class="ti ti-flame" style="color:#D85A30;" aria-hidden="true"></i></div>
+            <div><div class="s-name">Stress</div><div class="s-desc">Tensione percepita · alto penalizza</div></div>
+          </div>
+          <div class="s-badge" id="b-stress" style="background:#FAECE7;color:#993C1D;">5</div>
+        </div>
+        <div class="s-wrap">
+          <input type="range" id="s-stress" min="1" max="10" value="5" step="1" data-color="#D85A30" aria-label="Stress" />
+          <div class="s-minmax"><span>Nullo</span><span>Massimo</span></div>
+        </div>
+      </div>
+      <!-- SLIDER RECUPERO -->
+      <div class="s-card">
+        <div class="s-top">
+          <div class="s-id">
+            <div class="s-ico" style="background:#E1F5EE;"><i class="ti ti-moon" style="color:#0F6E56;" aria-hidden="true"></i></div>
+            <div><div class="s-name">Recupero</div><div class="s-desc">Qualità del riposo notturno</div></div>
+          </div>
+          <div class="s-badge" id="b-recovery" style="background:#E1F5EE;color:#0F6E56;">5</div>
+        </div>
+        <div class="s-wrap">
+          <input type="range" id="s-recovery" min="1" max="10" value="5" step="1" data-color="#1A8C5B" aria-label="Recupero" />
+          <div class="s-minmax"><span>Pessimo</span><span>Ottimale</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-area">
+      <button class="btn-pri" onclick="runAnalysis()">
+        <i class="ti ti-chart-radar" aria-hidden="true"></i>
+        Analizza il mio stato
+      </button>
+    </div>
+  </section>
+
+  <!-- SCHERMATA 2: LOADING -->
+  <section id="screen-load" class="load-screen">
+    <div class="load-ring-wrap"><div class="load-ring"></div><div class="load-dot"></div></div>
+    <p class="load-txt">Elaborazione Daily Coach…</p>
+    <p class="load-sub">Analisi e confronto in corso</p>
+  </section>
+
+  <!-- ═══════════════════════════════════
+       SCHERMATA 3: RISULTATI V3 + DAILY COACH V4
+  ═══════════════════════════════════ -->
+  <section id="screen-result" class="result-screen">
+
+    <!-- GAUGE CARD con Delta Visuale [V4] -->
+    <div class="gauge-card ai" id="r-gauge-card">
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 200 110" aria-hidden="true">
+          <path id="gauge-track" d="M 20,100 A 80,80 0 0 1 180,100" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="10" stroke-linecap="round"/>
+          <path id="gauge-fill"  d="M 20,100 A 80,80 0 0 1 180,100" fill="none" stroke="white" stroke-width="10" stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="251.2" style="transition:stroke-dashoffset 1s cubic-bezier(.34,1.2,.64,1),stroke .4s;"/>
+        </svg>
+        <div class="gauge-number" id="r-score-num">—</div>
+        <div class="gauge-sub">Readiness Score</div>
+        <div class="traffic-badge" id="r-traffic-badge">
+          <i class="ti" id="r-badge-icon" aria-hidden="true"></i>
+          <span class="traffic-badge-label" id="r-badge-label">—</span>
+        </div>
+        <!-- [V4] Delta visuale — nascosto se nessun confronto disponibile -->
+        <div class="delta-wrap" id="r-delta-wrap" style="display:none;">
+          <div class="delta-pill" id="r-delta-pill">
+            <i class="ti" id="r-delta-icon" aria-hidden="true"></i>
+            <span id="r-delta-text">—</span>
+          </div>
+        </div>
+      </div>
+      <p class="gauge-title" id="r-state-title"></p>
+      <p class="gauge-desc"  id="r-state-desc"></p>
+    </div>
+
+    <!-- MINI PARAMETRI -->
+    <div class="params-row ai">
+      <div class="p-mini"><span class="p-val" id="pm-mood"     style="color:#1A8C5B;">—</span><span class="p-lbl">Umore</span></div>
+      <div class="p-mini"><span class="p-val" id="pm-energy"   style="color:#185FA5;">—</span><span class="p-lbl">Energia</span></div>
+      <div class="p-mini"><span class="p-val" id="pm-stress"   style="color:#D85A30;">—</span><span class="p-lbl">Stress</span></div>
+      <div class="p-mini"><span class="p-val" id="pm-recovery" style="color:#0F6E56;">—</span><span class="p-lbl">Recupero</span></div>
+    </div>
+
+    <div class="sep ai"></div>
+
+    <!-- INSIGHT PARAMETRO LIMITANTE (V3 invariato) -->
+    <div class="insight-box ai" id="r-insight-box">
+      <div class="insight-accent" id="r-insight-accent"></div>
+      <div class="insight-head">
+        <div class="insight-ico" id="r-insight-ico"></div>
+        <div>
+          <div class="insight-tag">Insight del giorno</div>
+          <div class="insight-param" id="r-insight-param"></div>
+        </div>
+      </div>
+      <p class="insight-text" id="r-insight-text"></p>
+    </div>
+
+    <!-- PRIORITÀ OPERATIVA (V3 invariato) -->
+    <div class="sug-card ai">
+      <div class="sug-ico" id="r-prio-ico"></div>
+      <div><p class="sug-tag">Priorità operativa</p><p class="sug-title" id="r-prio-t"></p><p class="sug-txt" id="r-prio-d"></p></div>
+    </div>
+
+    <!-- ALLENAMENTO (V3 invariato) -->
+    <div class="sug-card ai">
+      <div class="sug-ico" id="r-train-ico"></div>
+      <div><p class="sug-tag">Allenamento</p><p class="sug-title" id="r-train-t"></p><p class="sug-txt" id="r-train-d"></p></div>
+    </div>
+
+    <!-- LAVORO (V3 invariato) -->
+    <div class="sug-card ai">
+      <div class="sug-ico" id="r-work-ico"></div>
+      <div><p class="sug-tag">Lavoro e focus</p><p class="sug-title" id="r-work-t"></p><p class="sug-txt" id="r-work-d"></p></div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         [V4] SEZIONE DAILY COACH
+         Popolata da renderDailyCoach() nel JS.
+         Visibile sempre, con contenuto variabile.
+    ══════════════════════════════════════ -->
+    <div class="coach-section ai" id="coach-section">
+      <div class="coach-section-label">
+        <i class="ti ti-robot" aria-hidden="true"></i>
+        Daily Coach
+      </div>
+      <!-- Confronto con ieri — visibile solo se c'è un record recente -->
+      <div id="coach-comparison"></div>
+      <!-- Priorità del Giorno — sempre visibile -->
+      <div id="coach-decision"></div>
+    </div>
+
+    <!-- [V4] TAKE HOME MESSAGE — sostituisce quote-block della V3 -->
+    <div class="thm-card ai" id="r-thm">
+      <div class="thm-ico"><i class="ti ti-bulb" aria-hidden="true"></i></div>
+      <div>
+        <div class="thm-tag">Take Home Message</div>
+        <p class="thm-text" id="r-thm-text"></p>
+      </div>
+    </div>
+
+    <!-- PULSANTE NUOVA ANALISI -->
+    <div class="btn-area ai">
+      <button class="btn-sec" onclick="resetApp()">
+        <i class="ti ti-refresh" aria-hidden="true"></i>
+        Nuova analisi
+      </button>
+    </div>
+
+    <!-- TREND & STORICO (V3 invariato) -->
+    <div class="trend-section ai" id="trend-section">
+      <div class="trend-header">
+        <div class="trend-header-ico"><i class="ti ti-chart-line" aria-hidden="true"></i></div>
+        <div>
+          <div class="trend-header-title">Trend & Storico</div>
+          <div class="trend-header-sub">Ultimi 7 check · dati locali</div>
+        </div>
+      </div>
+      <div id="trend-content"></div>
+    </div>
+
+  </section>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   JAVASCRIPT V4 — DAILY COACH
+   Sezioni:
+   A.  CONFIG           ← formula, soglie, testi (modifica qui)
+   B.  COACH CONFIG     ← [V4] testi e logica Daily Coach
+   C.  DATA / ORA
+   D.  SLIDER
+   E.  CALCOLO SCORE
+   F.  RENDER V3        ← gauge, insight, suggerimenti (invariato)
+   G.  [V4] DAILY COACH ← delta, confronto, decisione, THM
+   H.  STORICO V3       ← localStorage (invariato)
+   I.  FLUSSO           ← transizioni schermate
+═══════════════════════════════════════════════════════════════ */
+
+/* ══ A. CONFIG ════════════════════════════════════════════════ */
+const W = { recovery:3.5, energy:3.0, mood:2.0, stress:1.5 };
+const BONUS = { thr:7, stressThr:6, pts:3 };
+const THR   = { green:67, yellow:42 };
+
+const LIGHTS = {
+  green:  { ico:'ti-circle-check', label:'In Forma',    bg:'rgba(255,255,255,0.28)', col:'white', cardBg:'#1A7A4F', cardBorder:'#0F6E56', cardText:'white', gaugeTrack:'rgba(255,255,255,0.2)' },
+  yellow: { ico:'ti-alert-circle', label:'Attenzione',  bg:'rgba(255,255,255,0.28)', col:'white', cardBg:'#8C6800', cardBorder:'#7A5A00', cardText:'white', gaugeTrack:'rgba(255,255,255,0.2)' },
+  red:    { ico:'ti-circle-x',     label:'Riserve Basse',bg:'rgba(255,255,255,0.28)',col:'white', cardBg:'#A82424', cardBorder:'#8C1C1C', cardText:'white', gaugeTrack:'rgba(255,255,255,0.2)' }
+};
+
+const STATES = [
+  { id:'peak',       min:80,max:100, lbl:'PEAK PERFORMANCE', light:'green',  title:'Sei al massimo del potenziale.',       desc:'Tutti i sistemi sono allineati. Oggi puoi puntare agli obiettivi più ambiziosi: capacità fisica, cognitiva e motivazionale sono al picco.' },
+  { id:'informa',    min:67,max:79,  lbl:'IN FORMA',          light:'green',  title:'Giornata solida davanti a te.',         desc:'Recupero buono, energia presente. Sei in grado di performare ad alto livello con la giusta pianificazione.' },
+  { id:'balanced',   min:55,max:66,  lbl:'BILANCIATO',         light:'yellow', title:'Giornata nella media, gestibile.',      desc:'Condizioni stabili senza picchi né criticità. Lavora con metodo e rispetta i ritmi: puoi fare molto se non ti disperdi.' },
+  { id:'manageable', min:42,max:54,  lbl:'GESTIBILE',          light:'yellow', title:'Qualcosa rallenta il tuo motore.',      desc:'I parametri segnalano qualche squilibrio. Non forzare: scegli le battaglie giuste e preserva le energie per ciò che conta davvero.' },
+  { id:'lowres',     min:25,max:41,  lbl:'RISERVE BASSE',      light:'red',    title:'Il serbatoio è quasi vuoto.',           desc:'Corpo e mente ti stanno inviando un segnale chiaro. Ridimensiona le aspettative e metti il recupero al primo posto.' },
+  { id:'pressure',   min:0, max:24,  lbl:'SOTTO PRESSIONE',    light:'red',    title:'Lo stress domina la giornata.',         desc:'Stress elevato con risorse basse: questa combinazione richiede attenzione immediata. Priorità assoluta: ridurre il carico.', extra:(m,e,s,r)=>s>=7 },
+  { id:'exhausted',  min:0, max:24,  lbl:'ESAUSTO',            light:'red',    title:'Il recupero è insufficiente.',          desc:'Senza una base di riposo solida nessun parametro compensa. Oggi il compito principale è proteggere le energie residue.', extra:(m,e,s,r)=>r<=3 },
+  { id:'critical',   min:0, max:24,  lbl:'STATO CRITICO',      light:'red',    title:'Readiness molto bassa.',                desc:'Tutti i parametri segnalano una giornata difficile. Sii gentile con te stesso: anche fare poco bene è un risultato oggi.' }
+];
+
+const INSIGHT_TEXTS = {
+  recovery: { param:'Recupero', icon:'ti-moon',       bg:'#E1F5EE', col:'#0F6E56', accent:'#1A8C5B', title:'Il recupero limita la tua Readiness oggi.',     getText:(m,e,s,r)=>`Con un recupero di ${r}/10, la tua base fisiologica è ridotta. Anche se altri parametri reggono, il corpo non ha ricostituito pienamente le riserve. Evita picchi di intensità: punta su continuità e gestione dell'energia.` },
+  energy:   { param:'Energia',  icon:'ti-bolt',       bg:'#E6F1FB', col:'#185FA5', accent:'#185FA5', title:"L'energia è il parametro che rallenta oggi.",    getText:(m,e,s,r)=>`Con energia a ${e}/10, la tua capacità operativa è ridotta. Il tuo umore e il recupero sostengono la situazione, ma evita task che richiedono sforzo prolungato. Privilegia lavoro a blocchi brevi con pause frequenti.` },
+  mood:     { param:'Umore',    icon:'ti-mood-smile', bg:'#E1F5EE', col:'#0F6E56', accent:'#1A8C5B', title:"L'umore influenza la tua lucidità oggi.",        getText:(m,e,s,r)=>`Con umore a ${m}/10, la motivazione e la resilienza cognitiva sono ridotte. Fisicamente potresti reggere, ma le decisioni importanti rischiano di essere influenzate dall'umore.` },
+  stress:   { param:'Stress',   icon:'ti-flame',      bg:'#FAECE7', col:'#993C1D', accent:'#D85A30', title:'Lo stress è il fattore più critico oggi.',        getText:(m,e,s,r)=>`Con stress a ${s}/10, il sistema nervoso è sotto carico. Anche se energia e recupero reggono, lo stress elevato consuma risorse in modo invisibile e compromette la qualità cognitiva nel tempo.` }
+};
+
+const DRIVER_META = {
+  recovery: { icon:'ti-moon',       label:'Recupero' },
+  energy:   { icon:'ti-bolt',       label:'Energia'  },
+  mood:     { icon:'ti-mood-smile', label:'Umore'    },
+  stress:   { icon:'ti-flame',      label:'Stress'   }
+};
+
+const TRAIN = [
+  { when:(m,e,s,r)=>r>=7&&e>=7&&s<=4, ico:'ti-barbell', bg:'#EAF3DE',col:'#1A8C5B',t:'Allenamento intenso',      d:'Condizioni ideali per HIIT, forza massimale o sport ad alta intensità. Spingiti oltre la zona di comfort.' },
+  { when:(m,e,s,r)=>r>=6&&e>=5&&s<=6, ico:'ti-run',     bg:'#E6F1FB',col:'#185FA5',t:'Allenamento moderato',     d:'Ottimo per corsa a ritmo medio, circuiti funzionali o lavoro tecnico. Cura la qualità del movimento.' },
+  { when:(m,e,s,r)=>s>=7,             ico:'ti-yoga',    bg:'#FAEEDA',col:'#854F0B',t:'Movimento decompressivo',  d:"Con stress alto privilegia yoga, stretching profondo o camminate lente. L'obiettivo è abbassare il cortisolo." },
+  { when:(m,e,s,r)=>r<=4||e<=3,       ico:'ti-bed',     bg:'#FCEBEB',col:'#A32D2D',t:'Riposo attivo',            d:'Recupero o energia troppo bassi. Una camminata leggera da 20 minuti è il massimo consigliato oggi.' },
+  { when:()=>true,                     ico:'ti-walk',    bg:'#E6F1FB',col:'#185FA5',t:'Cardio leggero',           d:'30-40 minuti di attività aerobica leggera: ideale per mantenere il ritmo senza sovraccaricarsi.' }
+];
+const WORK = [
+  { when:(sc,m,e,s,r)=>sc>=75&&m>=7,  ico:'ti-brain',           bg:'#EAF3DE',col:'#1A8C5B',t:'Lavoro profondo e decisioni', d:'Massima lucidità disponibile. Affronta task complessi, prendi decisioni importanti, pianifica a lungo termine.' },
+  { when:(sc,m,e,s,r)=>sc>=55&&sc<75, ico:'ti-list-check',      bg:'#E6F1FB',col:'#185FA5',t:'Execution e task medi',       d:'Buon momento per avanzare sulla lista task: revisioni, call, deliverable già impostati.' },
+  { when:(sc,m,e,s,r)=>s>=8,          ico:'ti-arrows-minimize', bg:'#FAEEDA',col:'#854F0B',t:'Esecuzione meccanica',        d:'Con stress molto alto il pensiero creativo è compromesso. Solo task operativi e checklist.' },
+  { when:(sc,m,e,s,r)=>sc<45,         ico:'ti-transfer',        bg:'#FCEBEB',col:'#A32D2D',t:'Delega e rimanda',            d:'Risorse cognitive basse. Identifica cosa puoi posticipare o delegare. Non forzare la produttività.' },
+  { when:()=>true,                     ico:'ti-pencil',          bg:'#E6F1FB',col:'#185FA5',t:'Lavoro di routine',          d:'Giornata adatta per attività ricorrenti, aggiornamenti e compiti a bassa complessità decisionale.' }
+];
+const PRIO = {
+  green:  { ico:'ti-target',          bg:'#EAF3DE',col:'#1A8C5B',t:'Massimizza la giornata',  d:"Hai le risorse per fare la differenza oggi. Inizia dal task ad alto impatto, senza procrastinare." },
+  yellow: { ico:'ti-adjustments-alt', bg:'#FAEEDA',col:'#854F0B',t:'Gestisci le priorità',    d:"Non sprecare energia su task secondari. Usa blocchi di focus da 25 minuti con pause regolari." },
+  red:    { ico:'ti-shield',          bg:'#FCEBEB',col:'#A32D2D',t:'Proteggi le riserve',     d:"Priorità assoluta: non peggiorare lo stato attuale. Riduci gli impegni e pianifica il recupero." }
+};
+
+/* ══ B. COACH CONFIG ══════════════════════════════════════════
+   Configurazione Daily Coach V4.
+   Modifica i testi qui — non toccare le sezioni G e I.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Soglia giorni per confronto recente.
+   Se il record precedente è più vecchio di RECENT_DAYS giorni,
+   il confronto non viene mostrato (dati troppo distanti).
+   Modifica questo numero per allargare o restringere la finestra. */
+const RECENT_DAYS = 3;
+
+/* Soglia delta: variazioni entro ±DELTA_THRESHOLD punti = stabile */
+const DELTA_THRESHOLD = 4;
+
+/* Priorità del Giorno — logica a cascata:
+   La prima regola che corrisponde vince.
+   Parametri: score, driver, trendDir ('up'/'down'/'stable'/'none'), m, e, s, r
+   Modifica title e text per personalizzare i messaggi. */
+const DECISION_RULES = [
+  /* Picco con trend ascendente */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=80&&tr==='up',
+    title:'Sfrutta il picco — sei in crescita.',
+    text:'Score alto e trend positivo: è il momento ideale per affrontare sfide nuove, prendere decisioni importanti o iniziare progetti che richiedono energia sostenuta nel tempo.' },
+  /* Picco isolato (possibile rimbalzo) */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=80,
+    title:'Hai un picco di Readiness oggi.',
+    text:'Usalo per completare i task ad alta priorità che hai rimandato. Un picco dopo giorni difficili va capitalizzato subito: non è detto che si ripeta domani.' },
+  /* Buona forma, cognitivo alto */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=67&&m>=7&&e>=6,
+    title:'Oggi puoi sostenere attività ad alta richiesta cognitiva.',
+    text:'Umore e lucidità sono dalla tua parte. Attacca i task che richiedono concentrazione profonda: analisi, scrittura, decisioni strategiche.' },
+  /* Buona forma, trend discendente */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=67&&tr==='down',
+    title:'Buona Readiness, ma il trend scende.',
+    text:'Sei ancora in forma, ma i giorni precedenti mostrano un calo. Lavora bene oggi e inizia a proteggere il recupero serale per invertire la tendenza.' },
+  /* Buona forma generica */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=67,
+    title:'Giornata solida — lavora con metodo.',
+    text:'Le condizioni ci sono. Pianifica la giornata in blocchi di focus, rispetta le pause e non disperdere le energie su task secondari.' },
+  /* Media con stress alto */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=42&&s>=7,
+    title:'Oggi conviene privilegiare recupero e organizzazione.',
+    text:'Lo stress è il freno principale. Chiudi task aperti invece di aprirne di nuovi. Ridurre il carico percepito è più produttivo che aumentare il volume di lavoro.' },
+  /* Media con recupero basso */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=42&&dr==='recovery',
+    title:'Lavora in modo sostenibile — il recupero è in deficit.',
+    text:'Il corpo non ha le riserve per supportare un ritmo elevato. Task operativi e organizzativi sono ideali oggi. Proteggi il sonno di stasera: è il tuo investimento per domani.' },
+  /* Media generica */
+  { when:(sc,dr,tr,m,e,s,r)=>sc>=42,
+    title:'Gestisci le priorità — non disperdere le energie.',
+    text:'Condizioni nella media: puoi fare molto se scegli bene dove investire. Evita multitasking e distrazioni. Un task completato vale più di tre task al 50%.' },
+  /* Calo con trend discendente da più giorni */
+  { when:(sc,dr,tr,m,e,s,r)=>sc<42&&tr==='down',
+    title:'Interrompi il trend negativo — oggi è priorità il recupero.',
+    text:'Il calo dura da più giorni. Non si tratta di una giornata isolata: il sistema ha bisogno di una pausa reale. Riduci gli impegni e proteggi attivamente il recupero.' },
+  /* Calo con stress dominante */
+  { when:(sc,dr,tr,m,e,s,r)=>sc<42&&s>=7,
+    title:'Oggi evita decisioni importanti e proteggi le energie.',
+    text:'Stress alto e Readiness bassa compromettono il giudizio. Posticipa decisioni strategiche, deleghifica dove possibile e inserisci almeno una pausa decompressiva nella giornata.' },
+  /* Fallback riserve basse */
+  { when:()=>true,
+    title:'Oggi il tuo obiettivo è non peggiorare.',
+    text:'Le riserve sono basse. La priorità assoluta è il recupero: nessun task ad alta intensità, nessuna decisione importante. Anche fare poco bene è un risultato oggi.' }
+];
+
+/* Take Home Message — generato in base a score + delta + trend.
+   Prima regola che corrisponde vince.
+   Per modificare: edita le stringhe text qui sotto. */
+const THM_RULES = [
+  { when:(sc,delta,tr)=>sc>=80&&delta>10,
+    text:'Hai risorse fuori dalla norma. Usa questa finestra per avanzare sui fronti che richiedono il massimo da te.' },
+  { when:(sc,delta,tr)=>sc>=80&&tr==='up',
+    text:'Sei in crescita. Non sprecare questo momento su task di routine — attacca ciò che rimandavi.' },
+  { when:(sc,delta,tr)=>sc>=80,
+    text:'Le giornate peak non aspettano. Usala tutta.' },
+  { when:(sc,delta,tr)=>sc>=67&&delta>0,
+    text:'Oggi il tuo obiettivo non è aumentare l\'intensità ma mantenere continuità e completare ciò che conta.' },
+  { when:(sc,delta,tr)=>sc>=67,
+    text:'Quando sei in forma, anche la fatica diventa carburante. Avanza con metodo.' },
+  { when:(sc,delta,tr)=>sc>=55&&tr==='up',
+    text:'Stai risalendo. Consolida il miglioramento senza forzare il ritmo: la costanza batte i picchi isolati.' },
+  { when:(sc,delta,tr)=>sc>=55,
+    text:'Usa la finestra di energia attuale per completare i task prioritari, poi lascia spazio al recupero.' },
+  { when:(sc,delta,tr)=>sc>=42&&delta<-10,
+    text:'Il calo è marcato rispetto a ieri. Oggi non si costruisce — si preserva. Gestire bene una giornata difficile è un\'abilità.' },
+  { when:(sc,delta,tr)=>sc>=42,
+    text:'Gestire bene una giornata nella media è un\'abilità rara. Allenala oggi.' },
+  { when:(sc,delta,tr)=>tr==='down',
+    text:'Il trend scende da più giorni. Ridurre il carico oggi è investire sulla performance di domani.' },
+  { when:(sc,delta,tr)=>sc<25,
+    text:'Anche fermarsi fa parte della performance. Il recupero non è perdita di tempo — è l\'unico vero reset.' },
+  { when:()=>true,
+    text:'Proteggere le riserve residue è strategia, non debolezza.' }
+];
+
+/* ══ C. DATA / ORA ════════════════════════════════════════════ */
+function updateDT() {
+  const n=new Date();
+  document.getElementById('hdr-date').textContent=n.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('hdr-time').textContent=n.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+}
+updateDT(); setInterval(updateDT,30000);
+
+/* ══ D. SLIDER ════════════════════════════════════════════════ */
+function trackFill(inp) {
+  const pct=((inp.value-1)/9)*100;
+  inp.style.background=`linear-gradient(to right,${inp.dataset.color} ${pct}%,var(--track-bg) ${pct}%)`;
+}
+const BC={
+  mood:    v=>v>=8?['#C0DD97','#173404']:v>=5?['#E1F5EE','#0F6E56']:['#FAECE7','#993C1D'],
+  energy:  v=>v>=8?['#B5D4F4','#042C53']:v>=5?['#E6F1FB','#185FA5']:['#FAECE7','#993C1D'],
+  stress:  v=>v<=3?['#E1F5EE','#0F6E56']:v<=6?['#FAEEDA','#854F0B']:['#FCEBEB','#A32D2D'],
+  recovery:v=>v>=8?['#C0DD97','#173404']:v>=5?['#E1F5EE','#0F6E56']:['#FAECE7','#993C1D']
+};
+function initSlider(sid,bid,ck){
+  const inp=document.getElementById(sid),bdg=document.getElementById(bid);
+  const st=document.createElement('style');
+  st.textContent=`#${sid}::-webkit-slider-thumb{background:${inp.dataset.color}} #${sid}::-moz-range-thumb{background:${inp.dataset.color}}`;
+  document.head.appendChild(st);
+  const r=()=>{const v=parseInt(inp.value);trackFill(inp);const[bg,col]=BC[ck](v);bdg.style.background=bg;bdg.style.color=col;bdg.textContent=v;};
+  r(); inp.addEventListener('input',r);
+}
+initSlider('s-mood','b-mood','mood');
+initSlider('s-energy','b-energy','energy');
+initSlider('s-stress','b-stress','stress');
+initSlider('s-recovery','b-recovery','recovery');
+
+/* ══ E. CALCOLO SCORE ═════════════════════════════════════════ */
+function calcScore(m,e,s,r){
+  let sc=(r*W.recovery)+(e*W.energy)+(m*W.mood)+((10-s)*W.stress);
+  if(m>=BONUS.thr&&e>=BONUS.thr&&s<=BONUS.stressThr&&r>=BONUS.thr) sc+=BONUS.pts;
+  return Math.min(100,Math.round(sc));
+}
+function getState(score,m,e,s,r){
+  for(const st of STATES) if(st.extra&&score>=st.min&&score<=st.max&&st.extra(m,e,s,r)) return st;
+  for(const st of STATES) if(!st.extra&&score>=st.min&&score<=st.max) return st;
+  return STATES[STATES.length-1];
+}
+function getLight(sc){return sc>=THR.green?'green':sc>=THR.yellow?'yellow':'red';}
+
+const LW={recovery:3.5,energy:3.0,mood:2.0,stress:1.5};
+function getLimitingParam(m,e,s,r){
+  const losses={recovery:(10-r)*LW.recovery,energy:(10-e)*LW.energy,mood:(10-m)*LW.mood,stress:(s-1)*LW.stress};
+  return Object.entries(losses).sort((a,b)=>b[1]-a[1])[0][0];
+}
+
+/* ══ F. RENDER V3 (invariato) ═════════════════════════════════ */
+const GAUGE_LEN=251.2;
+function applyGauge(score,light){
+  const cfg=LIGHTS[light];
+  const card=document.getElementById('r-gauge-card');
+  card.style.background=cfg.cardBg; card.style.borderColor=cfg.cardBorder; card.style.color=cfg.cardText;
+  document.getElementById('gauge-track').setAttribute('stroke',cfg.gaugeTrack);
+  document.getElementById('gauge-fill').setAttribute('stroke','white');
+  setTimeout(()=>{document.getElementById('gauge-fill').style.strokeDashoffset=GAUGE_LEN*(1-score/100);},80);
+  document.getElementById('r-score-num').textContent=score;
+  const badge=document.getElementById('r-traffic-badge');
+  badge.style.background=cfg.bg; badge.style.color=cfg.col;
+  document.getElementById('r-badge-icon').className=`ti ${cfg.ico}`;
+}
+function fillSug(icoId,titleId,txtId,rule){
+  const ico=document.getElementById(icoId);
+  ico.innerHTML=`<i class="ti ${rule.ico}" aria-hidden="true"></i>`;
+  ico.style.background=rule.bg; ico.style.color=rule.col;
+  document.getElementById(titleId).textContent=rule.t;
+  document.getElementById(txtId).textContent=rule.d;
+}
+
+/* ══ G. [V4] DAILY COACH ══════════════════════════════════════
+   Tutte le funzioni nuove della V4.
+   Organizzate in:
+   G1. calcDelta       → calcola delta score e parametri
+   G2. getTrendDir     → direzione trend ultimi giorni
+   G3. buildComparison → testo confronto con ieri
+   G4. buildDecision   → card Priorità del Giorno
+   G5. buildTHM        → Take Home Message
+   G6. renderDelta     → mostra delta visuale nel gauge
+   G7. buildYesterdayCard → card IERI nella schermata form
+   G8. renderDailyCoach → assembla tutto
+════════════════════════════════════════════════════════════ */
+
+/* G1. calcDelta ──────────────────────────────────────────────
+   Confronta i parametri odierni con il record precedente.
+   Restituisce delta score e il parametro più cambiato.
+   Se il record precedente è più vecchio di RECENT_DAYS giorni
+   restituisce null (confronto non significativo). */
+function calcDelta(m,e,s,r,score){
+  const history=getHistory();
+  if(history.length===0) return null;
+
+  /* Prendi il record più recente (prima del check corrente) */
+  const prev=history[history.length-1];
+
+  /* Verifica che il record sia recente */
+  const prevDate=new Date(prev.date+'T12:00:00');
+  const today=new Date();
+  const diffDays=Math.round((today-prevDate)/(1000*60*60*24));
+  if(diffDays>RECENT_DAYS) return null;
+
+  const deltaScore=score-prev.score;
+
+  /* Delta per ogni parametro (stress: inverso) */
+  const paramDeltas={
+    mood:     m - prev.mood,
+    energy:   e - prev.energy,
+    stress:   prev.stress - s,    /* stress sceso = miglioramento */
+    recovery: r - prev.recovery
+  };
+
+  /* Parametro più migliorato e più peggiorato */
+  const sorted=Object.entries(paramDeltas).sort((a,b)=>b[1]-a[1]);
+  const mostImproved = sorted[0][1] > 1  ? sorted[0][0] : null;
+  const mostWorsened = sorted[sorted.length-1][1] < -1 ? sorted[sorted.length-1][0] : null;
+
+  /* Caso speciale: score identico ma profilo cambiato */
+  const profileChanged=Object.values(paramDeltas).some(d=>Math.abs(d)>=2);
+
+  return { deltaScore, paramDeltas, mostImproved, mostWorsened, profileChanged, prev };
+}
+
+/* G2. getTrendDir ────────────────────────────────────────────
+   Analizza gli ultimi record RECENTI (ultimi 7 giorni) e
+   restituisce la direzione del trend: 'up','down','stable','none'.
+   Usa solo record degli ultimi 7 giorni per evitare confronti
+   con dati troppo distanti nel tempo. */
+function getTrendDir(currentScore){
+  const history=getHistory();
+  const sevenDaysAgo=new Date(Date.now()-7*24*60*60*1000).toISOString().split('T')[0];
+  const recent=history.filter(r=>r.date>=sevenDaysAgo).slice(-5);
+  if(recent.length<2) return 'none';
+
+  const scores=recent.map(r=>r.score);
+  /* Confronta prima e seconda metà */
+  const half=Math.floor(scores.length/2);
+  const avgFirst=scores.slice(0,half).reduce((a,b)=>a+b,0)/half;
+  const avgLast= scores.slice(-Math.max(half,1)).reduce((a,b)=>a+b,0)/Math.max(half,1);
+  const diff=currentScore-avgFirst;
+
+  if(diff>6)  return 'up';
+  if(diff<-6) return 'down';
+  return 'stable';
+}
+
+/* G3. buildComparison ────────────────────────────────────────
+   Genera il testo della card "Confronto con ieri".
+   Gestisce: miglioramento, peggioramento, stabilità,
+   score identico con profilo cambiato, crollo marcato.
+   Per modificare i testi: edita le stringhe qui sotto. */
+function buildComparison(delta){
+  if(!delta) return '';
+
+  const {deltaScore,mostImproved,mostWorsened,profileChanged,prev}=delta;
+  const pLabels={mood:'umore',energy:'energia',stress:'stress',recovery:'recupero'};
+
+  let mainText='';
+  let subText='';
+
+  /* Crollo molto marcato (>30 punti) */
+  if(deltaScore<=-30){
+    mainText=`Calo molto marcato rispetto all'ultimo check (${prev.score} → ${prev.score+deltaScore}). Un crollo dopo un picco è spesso fisiologico: il corpo stava recuperando il surplus di ieri.`;
+    if(mostWorsened) subText=`Il parametro che ha subito la variazione maggiore è il ${pLabels[mostWorsened]}.`;
+  }
+  /* Salto molto positivo (>25 punti) */
+  else if(deltaScore>=25){
+    mainText=`Salto significativo rispetto all'ultimo check. ${mostImproved?'Il '+pLabels[mostImproved]+' è il parametro che ha contribuito di più al miglioramento.':'Tutti i parametri hanno contribuito positivamente.'}`;
+  }
+  /* Miglioramento */
+  else if(deltaScore>DELTA_THRESHOLD){
+    mainText=`Rispetto all'ultimo check la tua Readiness è migliorata. ${mostImproved?'Il parametro che ha inciso di più è il '+pLabels[mostImproved]+'.':''}`;
+    if(mostWorsened) subText=`Il ${pLabels[mostWorsened]} è invece leggermente calato.`;
+  }
+  /* Peggioramento */
+  else if(deltaScore<-DELTA_THRESHOLD){
+    mainText=`Rispetto all'ultimo check la tua Readiness è calata. ${mostWorsened?'Il parametro che ha inciso di più è il '+pLabels[mostWorsened]+'.':''}`;
+    if(mostImproved) subText=`Il ${pLabels[mostImproved]} è invece migliorato.`;
+  }
+  /* Score identico ma profilo cambiato */
+  else if(Math.abs(deltaScore)<=DELTA_THRESHOLD && profileChanged){
+    mainText=`Lo score è stabile rispetto all'ultimo check, ma il profilo interno è cambiato. ${mostImproved?'Il '+pLabels[mostImproved]+' è migliorato':''} ${mostWorsened?', il '+pLabels[mostWorsened]+' è calato':''}.`;
+    subText='Stesso numero, giornata diversa: i suggerimenti riflettono questo cambiamento.';
+  }
+  /* Stabile senza variazioni interne */
+  else {
+    mainText=`Il tuo stato è stabile rispetto all'ultimo check. Nessun parametro ha subito variazioni significative.`;
+  }
+
+  return `
+    <div class="coach-card">
+      <div class="coach-accent"></div>
+      <div class="coach-tag">Confronto con ultimo check</div>
+      <div class="coach-text">${mainText}</div>
+      ${subText?`<div class="coach-text-muted">${subText}</div>`:''}
+    </div>`;
+}
+
+/* G4. buildDecision ──────────────────────────────────────────
+   Card "Priorità del Giorno" — usa score, driver e trend.
+   La prima regola in DECISION_RULES che corrisponde vince.
+   Per modificare i testi: vai all'oggetto DECISION_RULES in sezione B. */
+function buildDecision(score,driver,trendDir,m,e,s,r){
+  const rule=DECISION_RULES.find(ru=>ru.when(score,driver,trendDir,m,e,s,r));
+  return `
+    <div class="decision-card">
+      <div class="decision-ico"><i class="ti ti-target" aria-hidden="true"></i></div>
+      <div>
+        <div class="decision-tag">Priorità del Giorno</div>
+        <div class="decision-title">${rule.title}</div>
+        <div class="decision-text">${rule.text}</div>
+      </div>
+    </div>`;
+}
+
+/* G5. buildTHM ───────────────────────────────────────────────
+   Take Home Message — sostituisce la quote block della V3.
+   Più operativo, specifico, basato su score + delta + trend.
+   Per modificare i testi: vai all'oggetto THM_RULES in sezione B. */
+function buildTHM(score,deltaScore,trendDir){
+  const delta=deltaScore!==null?deltaScore:0;
+  const rule=THM_RULES.find(ru=>ru.when(score,delta,trendDir));
+  return rule?rule.text:'Ogni check è un passo verso una maggiore consapevolezza.';
+}
+
+/* G6. renderDelta ────────────────────────────────────────────
+   Mostra il Delta Visuale nella gauge card.
+   Pill grande con freccia + punti + etichetta.
+   Soglia definita da DELTA_THRESHOLD in sezione B. */
+function renderDelta(deltaScore){
+  const wrap=document.getElementById('r-delta-wrap');
+  const pill=document.getElementById('r-delta-pill');
+  const icon=document.getElementById('r-delta-icon');
+  const txt =document.getElementById('r-delta-text');
+
+  if(deltaScore===null){ wrap.style.display='none'; return; }
+
+  wrap.style.display='flex';
+
+  if(deltaScore>DELTA_THRESHOLD){
+    pill.className='delta-pill up';
+    icon.className='ti ti-trending-up';
+    txt.textContent=`+${deltaScore} MIGLIORATO`;
+  } else if(deltaScore<-DELTA_THRESHOLD){
+    pill.className='delta-pill down';
+    icon.className='ti ti-trending-down';
+    txt.textContent=`${deltaScore} PEGGIORATO`;
+  } else {
+    pill.className='delta-pill stable';
+    icon.className='ti ti-minus';
+    txt.textContent='STABILE';
+  }
+}
+
+/* G7. buildYesterdayCard ─────────────────────────────────────
+   Costruisce la card IERI nella schermata form.
+   Mostrata sopra gli slider — si aggiorna al reset.
+   Se non ci sono record mostra messaggio primo check.
+   Limitazione nota: se due persone usano lo stesso browser
+   i dati si mischiano (no login = no separazione utenti). */
+function buildYesterdayCard(){
+  const wrap=document.getElementById('ycard-wrap');
+  if(!wrap) return;
+
+  const history=getHistory();
+
+  if(history.length===0){
+    wrap.innerHTML=`
+      <div class="ycard-first">
+        <i class="ti ti-rocket" aria-hidden="true"></i>
+        <div class="ycard-first-txt">
+          <strong>Questo è il tuo primo check.</strong><br>
+          Da oggi inizia il tuo monitoraggio quotidiano.
+        </div>
+      </div>`;
+    return;
+  }
+
+  const prev=history[history.length-1];
+  const dm=DRIVER_META[prev.driver]||{icon:'ti-minus',label:prev.driver};
+
+  /* Colore accent in base al semaforo del giorno precedente */
+  const accentColors={green:'var(--c-green)',yellow:'var(--c-yellow)',red:'var(--c-red)'};
+  const accent=accentColors[prev.light]||'var(--navy)';
+
+  /* Etichetta data */
+  const prevDateLabel=dateLabel(prev.date);
+
+  wrap.innerHTML=`
+    <div class="ycard">
+      <div class="ycard-accent" style="background:${accent};"></div>
+      <div class="ycard-head">
+        <div class="ycard-ico"><i class="ti ti-calendar" aria-hidden="true"></i></div>
+        <div class="ycard-label">${prevDateLabel} — Ultimo check (${prev.time})</div>
+      </div>
+      <div class="ycard-metrics">
+        <div class="ycard-metric">
+          <div class="ycard-metric-label">Score</div>
+          <div class="ycard-metric-val ${prev.light}">${prev.score}</div>
+        </div>
+        <div class="ycard-metric">
+          <div class="ycard-metric-label">Stato</div>
+          <div class="ycard-metric-val" style="font-size:11px;color:var(--text-1);">${prev.stateLabel}</div>
+        </div>
+        <div class="ycard-metric">
+          <div class="ycard-metric-label">Driver</div>
+          <div class="ycard-metric-val" style="font-size:12px;display:flex;align-items:center;gap:4px;color:var(--text-2);">
+            <i class="ti ${dm.icon}" style="font-size:13px;" aria-hidden="true"></i>${dm.label}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* G8. renderDailyCoach ───────────────────────────────────────
+   Assembla tutte le componenti Daily Coach dopo il check.
+   Chiamata da renderResults() dopo il render V3. */
+function renderDailyCoach(m,e,s,r,score,driver,trendDir){
+  /* Delta */
+  const delta=calcDelta(m,e,s,r,score);
+  const deltaScore=delta?delta.deltaScore:null;
+
+  /* Delta visuale nel gauge */
+  renderDelta(deltaScore);
+
+  /* Confronto con ieri */
+  const compHtml=buildComparison(delta);
+  document.getElementById('coach-comparison').innerHTML=compHtml;
+
+  /* Priorità del Giorno */
+  const decHtml=buildDecision(score,driver,trendDir,m,e,s,r);
+  document.getElementById('coach-decision').innerHTML=decHtml;
+
+  /* Take Home Message */
+  document.getElementById('r-thm-text').textContent=buildTHM(score,deltaScore,trendDir);
+}
+
+/* ══ H. STORICO V3 (invariato) ═══════════════════════════════ */
+const MAX_RECORDS=90, TABLE_ROWS=7, CHART_DAYS=7;
+
+function storageAvailable(){
+  try{localStorage.setItem('__t__','1');localStorage.removeItem('__t__');return true;}
+  catch(e){return false;}
+}
+function getHistory(){
+  if(!storageAvailable()) return [];
+  try{return JSON.parse(localStorage.getItem('mec_history')||'[]');}
+  catch(e){localStorage.removeItem('mec_history');return [];}
+}
+function setHistory(arr){
+  if(!storageAvailable()) return;
+  localStorage.setItem('mec_history',JSON.stringify(arr));
+}
+function saveCheck(m,e,s,r,score,state,light,driver){
+  const history=getHistory();
+  const now=new Date();
+  history.push({
+    id:now.getTime(), date:now.toISOString().split('T')[0],
+    time:now.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}),
+    mood:m,energy:e,stress:s,recovery:r,
+    score, stateId:state.id, stateLabel:state.lbl, light, driver
+  });
+  if(history.length>MAX_RECORDS) history.splice(0,history.length-MAX_RECORDS);
+  setHistory(history);
+}
+function dateLabel(dateStr){
+  const today=new Date().toISOString().split('T')[0];
+  const yest=new Date(Date.now()-86400000).toISOString().split('T')[0];
+  if(dateStr===today) return 'Oggi';
+  if(dateStr===yest)  return 'Ieri';
+  const d=new Date(dateStr+'T12:00:00');
+  return d.toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
+}
+function buildTrendInsight(history){
+  const recent=history.slice(-CHART_DAYS);
+  if(recent.length===0) return null;
+  let quantText='',dominantText='';
+  if(recent.length<3){
+    quantText='Dati ancora insufficienti per identificare un trend. Continua a fare check giornalieri.';
+  } else {
+    const half=Math.floor(recent.length/2);
+    const avgFirst=recent.slice(0,half).reduce((s,r)=>s+r.score,0)/half;
+    const avgLast= recent.slice(-half).reduce((s,r)=>s+r.score,0)/half;
+    const avgAll=  recent.reduce((s,r)=>s+r.score,0)/recent.length;
+    const diff=Math.round(avgLast-avgFirst);
+    const avgR=Math.round(avgAll);
+    if(Math.abs(diff)<3) quantText=`La tua Readiness media degli ultimi ${recent.length} check è ${avgR}/100. Il trend è stabile.`;
+    else if(diff>0) quantText=`La tua Readiness media è in aumento: +${diff} punti rispetto ai check precedenti. Media attuale: ${avgR}/100.`;
+    else quantText=`La tua Readiness media mostra un calo di ${Math.abs(diff)} punti rispetto ai check precedenti. Media attuale: ${avgR}/100.`;
+  }
+  if(recent.length<2){
+    dominantText='Effettua almeno 2 check per identificare il fattore dominante.';
+  } else {
+    const counts={};
+    recent.forEach(r=>{counts[r.driver]=(counts[r.driver]||0)+1;});
+    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    const lbl=DRIVER_META[top[0]]?.label||top[0];
+    const freq=Math.round((top[1]/recent.length)*100);
+    dominantText=top[1]===1
+      ?'I driver limitanti sono distribuiti uniformemente: nessun fattore domina in modo chiaro.'
+      :`Il ${lbl} è stato il fattore limitante nel ${freq}% dei tuoi check recenti. È il parametro su cui vale la pena concentrare attenzione.`;
+  }
+  return{quantText,dominantText};
+}
+let chartInstance=null;
+function buildChart(history){
+  const canvas=document.getElementById('trend-chart');
+  if(!canvas) return;
+  const recent=history.slice(-CHART_DAYS);
+  if(recent.length===0) return;
+  const labels=recent.map(r=>{const l=dateLabel(r.date);return(l==='Oggi'||l==='Ieri')?l:l.split(' ')[0];});
+  const scores=recent.map(r=>r.score);
+  const bgColors=recent.map(r=>r.light==='green'?'rgba(26,140,91,0.75)':r.light==='yellow'?'rgba(212,148,10,0.75)':'rgba(201,53,53,0.75)');
+  const bdColors=recent.map(r=>r.light==='green'?'#1A8C5B':r.light==='yellow'?'#D4940A':'#C93535');
+  if(chartInstance){chartInstance.destroy();chartInstance=null;}
+  chartInstance=new Chart(canvas,{
+    type:'bar',
+    data:{labels,datasets:[{data:scores,backgroundColor:bgColors,borderColor:bdColors,borderWidth:1.5,borderRadius:6,borderSkipped:false}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw} / 100`},backgroundColor:'#0B2240',titleFont:{family:"'Syne',sans-serif",size:11},bodyFont:{family:"'Syne',sans-serif",size:12,weight:'700'},padding:10,cornerRadius:8}},
+      scales:{
+        y:{min:0,max:100,grid:{color:'rgba(11,34,64,0.06)',drawBorder:false},ticks:{stepSize:25,font:{family:"'Syne',sans-serif",size:9},color:'#8AABCC'},border:{display:false}},
+        x:{grid:{display:false},ticks:{font:{family:"'Syne',sans-serif",size:10},color:'#4A6A8A'},border:{display:false}}
+      }
+    }
+  });
+}
+function buildHistoryTable(history){
+  const rows=history.slice(-TABLE_ROWS).reverse();
+  const rowsHtml=rows.map(r=>{
+    const dl=DRIVER_META[r.driver]||{icon:'ti-minus',label:r.driver};
+    return `<tr>
+      <td style="color:var(--text-2);font-size:11px;min-width:64px;">${dateLabel(r.date)}<br><span style="color:var(--text-3);font-size:9px;">${r.time}</span></td>
+      <td><span class="score-cell ${r.light}">${r.score}</span></td>
+      <td><span class="state-pill ${r.light}">${r.stateLabel}</span></td>
+      <td><span class="driver-pill"><i class="ti ${dl.icon}" aria-hidden="true"></i>${dl.label}</span></td>
+    </tr>`;
+  }).join('');
+  return `<table class="history-table" aria-label="Storico ultimi check"><thead><tr><th>Data</th><th>Score</th><th>Stato</th><th>Driver</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
+}
+function renderTrendSection(){
+  const container=document.getElementById('trend-content');
+  if(!container) return;
+  const history=getHistory();
+  if(history.length===0){
+    container.innerHTML=`<div class="trend-empty"><i class="ti ti-chart-dots" aria-hidden="true"></i><p>Nessun dato ancora disponibile.</p><span>Effettua il tuo primo check per iniziare il monitoraggio.</span></div>`;
+    return;
+  }
+  const insight=buildTrendInsight(history);
+  const insHtml=insight?`<div class="trend-insight-card"><div class="trend-insight-tag">Trend Insight</div><div class="trend-insight-row"><div class="trend-insight-bullet"></div><div class="trend-insight-text">${insight.quantText}</div></div><div class="trend-insight-row"><div class="trend-insight-bullet" style="background:var(--c-green);"></div><div class="trend-insight-text">${insight.dominantText}</div></div></div>`:'';
+  const chartHtml=`<div class="chart-card"><div class="chart-card-label">Readiness Score — ultimi ${Math.min(history.length,CHART_DAYS)} check</div><div class="chart-wrap"><canvas id="trend-chart" aria-label="Grafico andamento Readiness"></canvas></div></div>`;
+  const tableHtml=`<div class="history-card"><div class="history-card-label">Ultimi ${Math.min(history.length,TABLE_ROWS)} check</div><div class="history-scroll">${buildHistoryTable(history)}</div></div>`;
+  const resetHtml=`<button class="btn-reset-history" onclick="confirmResetHistory()"><i class="ti ti-trash" aria-hidden="true"></i>Reset storico</button>`;
+  container.innerHTML=insHtml+chartHtml+tableHtml+resetHtml;
+  buildChart(history);
+}
+function confirmResetHistory(){
+  if(window.confirm('Sei sicuro di voler cancellare tutto lo storico?\n\nQuesta azione non può essere annullata.')){
+    setHistory([]);
+    renderTrendSection();
+    buildYesterdayCard();
+  }
+}
+
+/* ══ I. FLUSSO ════════════════════════════════════════════════ */
+const $=id=>document.getElementById(id);
+function showEl(id,dt){
+  const el=$(id);el.style.display=dt||'block';el.style.opacity='0';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.transition='opacity .3s ease';el.style.opacity='1';}));
+}
+function hideEl(id,cb){
+  const el=$(id);el.style.transition='opacity .25s ease,transform .25s ease';
+  el.style.opacity='0';el.style.transform='translateY(-6px)';
+  setTimeout(()=>{el.style.display='none';el.style.transform='';if(cb)cb();},260);
+}
+
+function renderResults(m,e,s,r){
+  const score=calcScore(m,e,s,r);
+  const state=getState(score,m,e,s,r);
+  const light=getLight(score);
+  const driver=getLimitingParam(m,e,s,r);
+  const trendDir=getTrendDir(score);  /* calcolato PRIMA del salvataggio */
+
+  /* Render V3 */
+  applyGauge(score,light);
+  document.getElementById('r-badge-label').textContent=state.lbl;
+  document.getElementById('r-state-title').textContent=state.title;
+  document.getElementById('r-state-desc').textContent=state.desc;
+  document.getElementById('pm-mood').textContent=m;
+  document.getElementById('pm-energy').textContent=e;
+  document.getElementById('pm-stress').textContent=s;
+  document.getElementById('pm-recovery').textContent=r;
+  const ins=INSIGHT_TEXTS[driver];
+  document.getElementById('r-insight-accent').style.background=ins.accent;
+  const insIco=document.getElementById('r-insight-ico');
+  insIco.innerHTML=`<i class="ti ${ins.icon}" aria-hidden="true"></i>`;
+  insIco.style.background=ins.bg; insIco.style.color=ins.col;
+  document.getElementById('r-insight-param').textContent=ins.title;
+  document.getElementById('r-insight-text').textContent=ins.getText(m,e,s,r);
+  const prio=PRIO[light];
+  const prioIco=document.getElementById('r-prio-ico');
+  prioIco.innerHTML=`<i class="ti ${prio.ico}" aria-hidden="true"></i>`;
+  prioIco.style.background=prio.bg; prioIco.style.color=prio.col;
+  document.getElementById('r-prio-t').textContent=prio.t;
+  document.getElementById('r-prio-d').textContent=prio.d;
+  fillSug('r-train-ico','r-train-t','r-train-d',TRAIN.find(x=>x.when(m,e,s,r)));
+  fillSug('r-work-ico','r-work-t','r-work-d',WORK.find(x=>x.when(score,m,e,s,r)));
+
+  /* [V4] Daily Coach — PRIMA del salvataggio (calcDelta legge il record precedente) */
+  renderDailyCoach(m,e,s,r,score,driver,trendDir);
+
+  /* Salvataggio e trend */
+  saveCheck(m,e,s,r,score,state,light,driver);
+  renderTrendSection();
+}
+
+function runAnalysis(){
+  const m=parseInt($('s-mood').value);
+  const e=parseInt($('s-energy').value);
+  const s=parseInt($('s-stress').value);
+  const r=parseInt($('s-recovery').value);
+  hideEl('screen-form',()=>{
+    showEl('screen-load','flex');
+    setTimeout(()=>{
+      renderResults(m,e,s,r);
+      hideEl('screen-load',()=>{
+        showEl('screen-result');
+        window.scrollTo({top:0,behavior:'smooth'});
+      });
+    },1450);
+  });
+}
+
+function resetApp(){
+  hideEl('screen-result',()=>{
+    ['s-mood','s-energy','s-stress','s-recovery'].forEach(id=>{
+      $(id).value=5; $(id).dispatchEvent(new Event('input'));
+    });
+    document.getElementById('gauge-fill').style.strokeDashoffset=GAUGE_LEN;
+    buildYesterdayCard();   /* aggiorna la card IERI con il check appena salvato */
+    showEl('screen-form');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+}
+
+/* Inizializzazione: costruisci la card IERI al caricamento della pagina */
+buildYesterdayCard();
+</script>
+</body>
+</html>
